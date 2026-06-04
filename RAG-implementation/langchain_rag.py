@@ -1,12 +1,12 @@
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
-
 from huggingface_hub import InferenceClient
 from dotenv import load_dotenv
 import os
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
 
 #for langchain rag chain 
 load_dotenv()
@@ -48,9 +48,7 @@ retriever = vectorstore.as_retriever(
 )
 
 
-vector = embeddings.embed_query(
-    "What is Python?"
-)
+
 
 
 
@@ -62,32 +60,48 @@ context = "\n\n".join(
     [doc.page_content for doc in results]
 )
 
-prompt = f"""
-Answer the question using ONLY the provided context.
+prompt = ChatPromptTemplate.from_template(
+    """
+    Answer using the provided context.
 
-Context:
-{context}
+    Context:
+    {context}
 
-Question:
-{query}
+    Question:
+    {question}
 
-If the answer is not present in the context, say:
-"I don't know."
+    If the context contains relevant information, use it to answer.
+    Only say "I don't know" if the context contains no information related to the question.
+    
+    Answer:
+    """
+)
 
-Answer:
-"""
-for doc in results:
-    print("-" * 50)
-    print(doc.page_content)
+formatted = prompt.invoke(
+    {
+        "context": context,
+        "question": query
+    }
+)
 
-for doc in results:
-    print(doc.metadata)
+print(formatted)
+
+#for doc in results:
+  #  print("-" * 50)
+  #  print(doc.page_content)
+
+#for doc in results:
+   # print(doc.metadata)
+
+#print("\nPROMPT SENT TO LLM")
+#print("=" * 50)
+#print(formatted.messages[0].content)
 
 response = llm.chat_completion(
     messages=[
         {
             "role": "user",
-            "content": prompt
+            "content": formatted.messages[0].content
         }
     ],
     max_tokens=300
